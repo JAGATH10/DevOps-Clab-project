@@ -3,15 +3,22 @@ pipeline {
 
     environment {
         DOCKER_IMAGE = 'clab-task-app'
-        DOCKER_TAG = "latest-" + new Date().getTime()
         DOCKER_HUB_USER = 'jagath10'
         AWS_REGION = 'us-east-1'
         SNS_TOPIC_ARN = 'arn:aws:sns:us-east-1:908027374186:created_success'
         EC2_INSTANCE = '54.234.43.52'
-        CONTAINER_NAME = "clab-container-" + new Date().getTime()
     }
 
     stages {
+        stage('Initialize Variables') {
+            steps {
+                script {
+                    env.DOCKER_TAG = "latest-${System.currentTimeMillis()}"
+                    env.CONTAINER_NAME = "clab-container-${System.currentTimeMillis()}"
+                }
+            }
+        }
+
         stage('Checkout Code') {
             steps {
                 script {
