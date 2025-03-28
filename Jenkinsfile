@@ -7,6 +7,8 @@ pipeline {
         AWS_REGION = 'us-east-1'
         SNS_TOPIC_ARN = 'arn:aws:sns:us-east-1:908027374186:created_success'
         EC2_INSTANCE = '54.234.43.52'
+        DB_HOST = '54.234.43.52'  // EC2 instance where MariaDB is running
+        DB_PORT = '3306'
     }
 
     stages {
@@ -58,7 +60,10 @@ pipeline {
                             docker pull ${DOCKER_HUB_USER}/${DOCKER_IMAGE}:${DOCKER_TAG} &&
                             docker stop \$(docker ps -q --filter ancestor=${DOCKER_HUB_USER}/${DOCKER_IMAGE}) || true &&
                             docker rm \$(docker ps -aq --filter ancestor=${DOCKER_HUB_USER}/${DOCKER_IMAGE}) || true &&
-                            docker run -d --name ${CONTAINER_NAME} -p 3000:3000 ${DOCKER_HUB_USER}/${DOCKER_IMAGE}:${DOCKER_TAG}
+                            docker run -d --name ${CONTAINER_NAME} -p 3000:3000 \
+                                -e DB_HOST=${DB_HOST} \
+                                -e DB_PORT=${DB_PORT} \
+                                ${DOCKER_HUB_USER}/${DOCKER_IMAGE}:${DOCKER_TAG}
                             '
                         """
                     }
