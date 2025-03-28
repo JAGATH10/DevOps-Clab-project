@@ -37,39 +37,40 @@ pipeline {
 
         stage('Tag & Push Docker Image to Docker Hub') {
             steps {
-                script {
-                    sh """
-                        docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_HUB_USER}/${DOCKER_IMAGE}:${DOCKER_TAG}
-                        docker login -u ${DOCKER_HUB_USER} -p ${env.DOCKER_PASSWORD}
-                        docker push ${DOCKER_HUB_USER}/${DOCKER_IMAGE}:${DOCKER_TAG}
-                    """
+                withCredentials([usernamePassword(credentialsId: 'docker-hub-cred', usernameVariable: 'DOCKER_HUB_USER', passwordVariable: 'DOCKER_PASSWORD')]) {
+                    script {
+                        sh """
+                            docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_HUB_USER}/${DOCKER_IMAGE}:${DOCKER_TAG}
+                            echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_HUB_USER" --password-stdin
+                            docker push ${DOCKER_HUB_USER}/${DOCKER_IMAGE}:${DOCKER_TAG}
+                        """
+                    }
                 }
             }
         }
 
         stage('Deploy on EC2') {
             steps {
-                script {
-                    sh """
-                        ssh -o StrictHostKeyChecking=no ec2-user@${EC2_INSTANCE} '
-                        docker pull ${DOCKER_HUB_USER}/${DOCKER_IMAGE}:${DOCKER_TAG} &&
-                        docker stop \$(docker ps -q --filter ancestor=${DOCKER_HUB_USER}/${DOCKER_IMAGE}) || true &&
-                        docker run -d --name ${CONTAINER_NAME} -p 3000:3000 ${DOCKER_HUB_USER}/${DOCKER_IMAGE}:${DOCKER_TAG}'
-                    """
+                sshagent(['ec2-ssh-key']) {
+                    script {
+                        sh """
+                            ssh -o StrictHostKeyChecking=no ec2-user@${EC2_INSTANCE} '
+                            docker pull ${DOCKER_HUB_USER}/${DOCKER_IMAGE}:${DOCKER_TAG} &&
+                            docker stop \$(docker ps -q --filter ancestor=${DOCKER_HUB_USER}/${DOCKER_IMAGE}) || true &&
+                            docker rm \$(docker ps -aq --filter ancestor=${DOCKER_HUB_USER}/${DOCKER_IMAGE}) || true &&
+                            docker run -d --name ${CONTAINER_NAME} -p 3000:3000 ${DOCKER_HUB_USER}/${DOCKER_IMAGE}:${DOCKER_TAG}
+                            '
+                        """
+                    }
                 }
             }
         }
 
         stage('Notify Success via AWS SNS') {
             steps {
-                withCredentials([
-                    string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
-                    string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY')
-                ]) {
+                withCredentials([aws(credentialsId: 'aws-cred')]) {
                     script {
                         sh """
-                            export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-                            export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
                             aws sns publish --region ${AWS_REGION} --topic-arn ${SNS_TOPIC_ARN} --message 'Build & Deployment successful!'
                         """
                     }
@@ -80,14 +81,9 @@ pipeline {
 
     post {
         failure {
-            withCredentials([
-                string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
-                string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY')
-            ]) {
+            withCredentials([aws(credentialsId: 'aws-cred')]) {
                 script {
                     sh """
-                        export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-                        export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
                         aws sns publish --region ${AWS_REGION} --topic-arn ${SNS_TOPIC_ARN} --message 'Build & Deployment failed!'
                     """
                 }
