@@ -7,8 +7,17 @@ pipeline {
         AWS_REGION = 'us-east-1'
         SNS_TOPIC_ARN = 'arn:aws:sns:us-east-1:908027374186:created_success'
         EC2_INSTANCE = '54.234.43.52'
-        DB_HOST = '54.234.43.52'  // EC2 instance where MariaDB is running
-        DB_PORT = '3306'
+
+        // Database Details
+        MYSQL_DATABASE = 'clab_task'
+        MYSQL_USERNAME = 'jagath'
+        MYSQL_ROOT_PASSWORD = '123'
+        MYSQL_HOST = '54.234.43.52'
+        MYSQL_LOCAL_PORT = '3306'
+        MYSQL_DOCKER_PORT = '3306'
+
+        // Node.js App Port
+        NODEJS_LOCAL_PORT = '3000'
     }
 
     stages {
@@ -58,11 +67,21 @@ pipeline {
                         sh """
                             ssh -o StrictHostKeyChecking=no ec2-user@${EC2_INSTANCE} '
                             docker pull ${DOCKER_HUB_USER}/${DOCKER_IMAGE}:${DOCKER_TAG} &&
+                            
+                            # Stop and remove old container if exists
                             docker stop \$(docker ps -q --filter ancestor=${DOCKER_HUB_USER}/${DOCKER_IMAGE}) || true &&
                             docker rm \$(docker ps -aq --filter ancestor=${DOCKER_HUB_USER}/${DOCKER_IMAGE}) || true &&
-                            docker run -d --name ${CONTAINER_NAME} -p 3000:3000 \
-                                -e DB_HOST=${DB_HOST} \
-                                -e DB_PORT=${DB_PORT} \
+                            
+                            # Run new container with MySQL credentials
+                            docker run -d --name ${CONTAINER_NAME} -p ${NODEJS_LOCAL_PORT}:${NODEJS_LOCAL_PORT} \
+                                --restart always \
+                                -e MYSQL_DATABASE="${MYSQL_DATABASE}" \
+                                -e MYSQL_USERNAME="${MYSQL_USERNAME}" \
+                                -e MYSQL_ROOT_PASSWORD="${MYSQL_ROOT_PASSWORD}" \
+                                -e MYSQL_HOST="${MYSQL_HOST}" \
+                                -e MYSQL_LOCAL_PORT="${MYSQL_LOCAL_PORT}" \
+                                -e MYSQL_DOCKER_PORT="${MYSQL_DOCKER_PORT}" \
+                                -e NODE_ENV="production" \
                                 ${DOCKER_HUB_USER}/${DOCKER_IMAGE}:${DOCKER_TAG}
                             '
                         """
