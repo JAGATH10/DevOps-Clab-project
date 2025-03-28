@@ -1,13 +1,27 @@
-FROM node:14
+# Use a stable Node.js version
+FROM node:20-alpine
 
+# Set the working directory
 WORKDIR /app
 
-COPY ./package.json .
+# Copy only package.json and package-lock.json first (to optimize Docker caching)
+COPY package*.json ./
 
-RUN npm install
+# Install dependencies
+RUN npm install --only=production
 
-COPY . /app
+# Copy the rest of the application files
+COPY . .
 
+# Expose the application port
 EXPOSE 3000
 
-CMD [ "npm", "start" ]
+# Set environment variables for production
+ENV NODE_ENV=production
+
+# Use a non-root user for security
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+USER appuser
+
+# Command to start the application
+CMD ["npm", "start"]

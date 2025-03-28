@@ -9,7 +9,7 @@ const sequelize = new Sequelize(
 	process.env.MYSQL_ROOT_PASSWORD,
 	{
 		dialect: 'mysql',
-		host: process.env.MYSQL_HOST || 'localhost',
+		host: process.env.MYSQL_HOST ,
 		port: process.env.MYSQL_LOCAL_PORT,
 		logging: false,
 	}

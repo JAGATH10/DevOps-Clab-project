@@ -14,9 +14,9 @@ module.exports = (sequelize, DataTypes) => {
 			},
 		},
 		{
-			// Other model options go here
+			tableName: 'user', // Explicitly set table name
+		    timestamps: true,
 		}
 	);
-
 	return User;
 };
